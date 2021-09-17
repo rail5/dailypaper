@@ -153,6 +153,7 @@ function pullFromPW() {
 
 		$content = str_replace('#', '\#', $content);
 		$content = str_replace('$', '\$', $content); //escaping #'s and $'s for LaTeX compatibility
+		$content = str_replace("%", "\%", $content);
 
 //		echo "<h3>".$pw["channel"]["item"][$i]["title"]."</h3><br>".PHP_EOL;
 //		echo $pw["channel"]["item"][$i]["pubDate"]." - <i>$author</i><br>".PHP_EOL;
@@ -310,6 +311,7 @@ function pullFromCPUSA() {
 		$content = str_replace('#', '\#', $content);
 		$content = str_replace('$', '\$', $content);
 		$content = str_replace('&', '\&', $content); //escaping #'s, $'s and &'s for LaTeX compatibility
+		$content = str_replace("%", "\%", $content);
 		
 		$content = str_replace('\textbf{'.PHP_EOL.'\hfill', PHP_EOL.'\hfill', $content);
 		$content = str_replace('\hfill'.PHP_EOL.'}'.PHP_EOL, '\hfill'.PHP_EOL, $content);
@@ -497,6 +499,7 @@ function pullFromGranma() {
 		$content = str_replace('#', '\#', $content);
 		$content = str_replace('$', '\$', $content);
 		$content = str_replace('&', '\&', $content); //escaping #'s, $'s and &'s for LaTeX compatibility
+		$content = str_replace("%", "\%", $content);
 		
 		$content = str_replace('\textbf{'.PHP_EOL.'\hfill', PHP_EOL.'\hfill', $content);
 		$content = str_replace('\hfill'.PHP_EOL.'}'.PHP_EOL, '\hfill'.PHP_EOL, $content);
@@ -519,7 +522,7 @@ function pullFromGranma() {
 	
 }
 
-$longopts = array("pw", "cpusa", "granma");
+$longopts = array("pw", "cpusa", "granma", "invert", "help");
 $shortopts = "";
 
 $options = getopt($shortopts, $longopts);
@@ -529,8 +532,28 @@ if (isset($options["pw"])) {
 	echo pullFromCPUSA();
 } else if (isset($options["granma"])) {
 	echo pullFromGranma();
+} else if (isset($options["help"])) {
+	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma} (--invert)".PHP_EOL;
+	echo "--pw pulls from Peoples World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma".PHP_EOL;
+	echo "--invert will invert the colors of very dark images (thumbnails and in-article photos) (in order to save ink when printed)".PHP_EOL;
+	echo "\nExample command chain:\nphp dailypaper.php --pw --invert > pw.tex && pdflatex -interaction=nonstopmode ./pw.tex && liesel -i ./pw.pdf -vbfg -d 200 -o ./pw-to-print.pdf".PHP_EOL;
+	die();
 } else {
-	die("Error: try again with --pw, --cpusa, or --granma");
+	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma} (--invert)".PHP_EOL;
+	echo "--pw pulls from People's World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma\n".PHP_EOL;
+	echo "--invert will invert the colors of very dark images (thumbnails and in-article photos) (in order to save ink when printed)".PHP_EOL;
+	echo "\nExample command chain:\nphp dailypaper.php --pw --invert > pw.tex && pdflatex -interaction=nonstopmode ./pw.tex && liesel -i ./pw.pdf -vbfg -d 200 -o ./pw-to-print.pdf".PHP_EOL;
+	die();
+}
+
+if (isset($options["invert"])) {
+	$images = scandir('images/');
+	foreach($images as $image) {
+		$brightness = shell_exec("convert ./images/$image -colorspace Gray -format \"%[fx:image.mean]\" info: 2>/dev/null");
+		if ($brightness < 0.5) {
+			shell_exec("convert ./images/$image -channel RGB -negate ./images/$image 2>/dev/null");
+		}
+	}
 }
 
 ?>
