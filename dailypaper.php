@@ -217,7 +217,7 @@ function pullFromCPUSA() {
 		\null
 		\vfill
 		\begin{Large}
-			CPUSA Weekly
+			CPUSA
 		\end{Large}
 	
 		\includegraphics[width=10cm,height=10cm,keepaspectratio]{./cpusa-logo.png}
@@ -522,6 +522,155 @@ function pullFromGranma() {
 	
 }
 
+function pullFromQS() {
+
+
+	$newspaper = '\documentclass[oneside,12pt,openany]{book}
+\usepackage[paperwidth=5.5in,paperheight=8.5in,total={4.8in,8.0in}]{geometry}
+\pdfpageheight=8.5in
+\pdfpagewidth=5.5in
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{grffile}
+\makeatletter
+\def\@makechapterhead#1{%
+  \vspace*{0\p@}%
+  {\parindent \z@ \raggedright \normalfont
+    \interlinepenalty\@M
+    \Large \bfseries #1\par\nobreak
+    \vskip 0\p@
+  }}
+\def\@makeschapterhead#1{%
+  \vspace*{0\p@}%
+  {\parindent \z@ \raggedright
+    \normalfont
+    \interlinepenalty\@M
+    \Large \bfseries  #1\par\nobreak
+    \vskip 0\p@
+  }}
+\makeatother
+\begin{document}
+	\begin{center}
+		\begin{Large}
+'.date("d F, Y").'
+		\end{Large}
+		
+		\vfill
+	
+		\includegraphics[width=10cm,height=10cm,keepaspectratio]{./qs-logo.png}
+	
+		\vfill
+		
+	\end{center}
+
+';
+
+	$frontpage = file_get_contents("http://en.qstheory.cn"); // they have no rss feed
+	preg_match_all("/href=\"http:\/\/en.qstheory.cn[0-9\/a-z\-\_\.]*\.htm\">/", $frontpage, $links);
+	
+	$links = array_unique($links[0]); // multiple occurences sometimes on qs
+	
+	$i = 0;
+	
+	while ($i < 20) {
+		fwrite(STDERR, "doing number $i\n");
+		
+		$articlelink = str_replace("href=\"", "", $links[$i]);
+		$articlelink = str_replace("\">", "", $articlelink);
+		
+		fwrite(STDERR, $articlelink.PHP_EOL.PHP_EOL);
+		
+		$article = file_get_contents($articlelink);
+		
+		preg_match('/<h1.*topBtn begin -->/s', $article, $content);
+		
+		$content = html_entity_decode($content[0]);
+		$content = htmlspecialchars_decode($content);
+		
+		
+		/* Gather in-article images */
+		$contentimgs = array();
+		$content = str_replace("\">", "\">".PHP_EOL.PHP_EOL, $content); // cleaning it up for regex
+		preg_match_all('/<img.*src=".*" alt/', $content, $contentimgs);
+		$aye = 0;
+		while ($aye < count($contentimgs[0])) {
+			$contentimgs[0][$aye] = preg_replace('/<img.*src="/', '', $contentimgs[0][$aye]);
+			$contentimgs[0][$aye] = str_replace('" alt', '', $contentimgs[0][$aye]);
+			$contentimgpath = str_replace('/', '', $contentimgs[0][$aye]);
+			$contentimgpath = 'images/'.$contentimgpath;
+			
+			if (!file_exists($contentimgpath)) {
+				file_put_contents($contentimgpath, file_get_contents($contentimgs[0][$aye]));
+			}
+			$aye = $aye + 1;
+		}
+	
+	
+		$content = str_replace('\\', '\\\\', $content); //backslashes fuck up LaTeX
+		
+		$content = preg_replace('/<img.*src="/', '', $content);
+		$content = preg_replace('/" alt.*>/', PHP_EOL.PHP_EOL, $content);
+		$content = preg_replace('/<span style.*">/', PHP_EOL.PHP_EOL.'\begin{tiny}'.PHP_EOL, $content);
+		$content = str_replace("</span></p>", PHP_EOL.'\\end{tiny}'.PHP_EOL.PHP_EOL, $content);
+		$content = str_replace("</span>".PHP_EOL."</p>", PHP_EOL.'\\end{tiny}'.PHP_EOL.PHP_EOL, $content);
+
+
+
+
+		
+
+		$content = str_replace('<p>', PHP_EOL.PHP_EOL.'\noindent ', $content); //open paragraphs
+		$content = str_replace('</p>', PHP_EOL.PHP_EOL, $content); //close paragraphs
+		$content = html_entity_decode($content); 
+		$content = str_replace("<li>", " - ", $content);
+		$content = str_replace("<b>", '\textbf{', $content);
+		$content = str_replace("</b>", '}', $content); //support for bold text
+		$content = str_replace("<strong>", '\textbf{', $content);
+		$content = str_replace("</strong>", '}', $content); //more support for bold text
+		$content = str_replace("<i>", '\textit{', $content);
+		$content = str_replace("</i>", '}', $content);; //support for italic text
+		$content = str_replace("<em>", '\textit{', $content);
+		$content = str_replace("</em>", '}', $content);; //more support for italic text
+		$content = str_replace("<blockquote>", PHP_EOL.'\begin{center}'.PHP_EOL, $content);
+		$content = str_replace("</blockquote>", PHP_EOL.'\end{center}'.PHP_EOL.PHP_EOL, $content); //support for blockquotes
+		
+		$content = str_replace('#', '\#', $content);
+		$content = str_replace('$', '\$', $content);
+		$content = str_replace("%", "\%", $content);
+		
+		preg_match('/<h1>.*<\/h1>/', $content, $title);
+		
+		
+		$content = str_replace('/', '', $content);	
+		$content = str_replace('https:', PHP_EOL.'\hfill'.PHP_EOL.PHP_EOL.'\begin{center}'.PHP_EOL.'\includegraphics[width=5cm,height=5cm,keepaspectratio]{./images/https:', $content); // this is so shady
+		$content = str_replace('http:', PHP_EOL.'\hfill'.PHP_EOL.PHP_EOL.'\begin{center}'.PHP_EOL.'\includegraphics[width=5cm,height=5cm,keepaspectratio]{./images/http:', $content);
+		$content = str_replace('.jpg', '.jpg}'.PHP_EOL.'\\end{center}'.PHP_EOL.'\hfill'.PHP_EOL, $content);
+		$content = str_replace('.jpeg', '.jpeg}'.PHP_EOL.'\\end{center}'.PHP_EOL.'\hfill', $content);
+		$content = str_replace('.png', '.png}'.PHP_EOL.'\\end{center}'.PHP_EOL.'\hfill', $content);
+		$content = str_replace('.gif', '.gif}'.PHP_EOL.'\\end{center}'.PHP_EOL.'\hfill', $content);		
+		
+		preg_match('/<div class="arcCont.*/s', $content, $body);
+	
+		$newspaper = $newspaper."\chapter{}".PHP_EOL.PHP_EOL;
+		
+		$title = str_replace("<h1>", "\begin{Large}".PHP_EOL.PHP_EOL, $title[0]);
+		$title = str_replace("</h1>", PHP_EOL.PHP_EOL."\\end{Large}".PHP_EOL.PHP_EOL, $title);
+		
+		$title = strip_tags($title);
+		
+		$body = strip_tags($body[0]);
+		
+		$newspaper = $newspaper.PHP_EOL.PHP_EOL.$title.PHP_EOL.PHP_EOL."\hfill".PHP_EOL.PHP_EOL.$body."\hfill".PHP_EOL.PHP_EOL;
+		
+		$i = $i + 1;	
+	}
+	
+	$newspaper = $newspaper.PHP_EOL.PHP_EOL."\\end{document}";
+	
+	return $newspaper;
+
+}
+
 $longopts = array("pw", "cpusa", "granma", "invert", "help");
 $shortopts = "";
 
@@ -532,15 +681,18 @@ if (isset($options["pw"])) {
 	echo pullFromCPUSA();
 } else if (isset($options["granma"])) {
 	echo pullFromGranma();
+} else if (isset($options["qs"])) {
+	echo pullFromQS();
+}
 } else if (isset($options["help"])) {
-	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma} (--invert)".PHP_EOL;
-	echo "--pw pulls from Peoples World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma".PHP_EOL;
+	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma,qs} (--invert)".PHP_EOL;
+	echo "--pw pulls from Peoples World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma,\n--qs pulls from QiuShi".PHP_EOL;
 	echo "--invert will invert the colors of very dark images (thumbnails and in-article photos) (in order to save ink when printed)".PHP_EOL;
 	echo "\nExample command chain:\nphp dailypaper.php --pw --invert > pw.tex && pdflatex -interaction=nonstopmode ./pw.tex && liesel -i ./pw.pdf -vbfg -d 200 -o ./pw-to-print.pdf".PHP_EOL;
 	die();
 } else {
-	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma} (--invert)".PHP_EOL;
-	echo "--pw pulls from People's World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma\n".PHP_EOL;
+	echo "Usage:\n\ndailypaper.php --{pw,cpusa,granma,qs} (--invert)".PHP_EOL;
+	echo "--pw pulls from People's World,\n--cpusa pulls from the CPUSA website,\n--granma pulls from Granma,\n--qs pulls from QiuShi".PHP_EOL;
 	echo "--invert will invert the colors of very dark images (thumbnails and in-article photos) (in order to save ink when printed)".PHP_EOL;
 	echo "\nExample command chain:\nphp dailypaper.php --pw --invert > pw.tex && pdflatex -interaction=nonstopmode ./pw.tex && liesel -i ./pw.pdf -vbfg -d 200 -o ./pw-to-print.pdf".PHP_EOL;
 	die();
