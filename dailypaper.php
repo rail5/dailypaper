@@ -671,7 +671,7 @@ function pullFromQS() {
 
 }
 
-$longopts = array("pw", "cpusa", "granma", "invert", "help");
+$longopts = array("pw", "cpusa", "granma", "qs", "invert", "help");
 $shortopts = "";
 
 $options = getopt($shortopts, $longopts);
