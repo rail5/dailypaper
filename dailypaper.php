@@ -566,17 +566,22 @@ function pullFromQS() {
 ';
 
 	$frontpage = file_get_contents("http://en.qstheory.cn"); // they have no rss feed
-	preg_match_all("/href=\"http:\/\/en.qstheory.cn[0-9\/a-z\-\_\.]*\.htm\">/", $frontpage, $links);
+	preg_match_all("/href=\"[0-9\/a-z\-\_\.\:]*\.htm\">/", $frontpage, $links);
 	
-	$links = array_unique($links[0]); // multiple occurences sometimes on qs
+	$links = array_values(array_unique($links[0])); // multiple occurences sometimes on qs
 	
-	$i = 0;
+	$i = 1;
 	
-	while ($i < 20) {
+	
+	while ($i < count($links)) {
 		fwrite(STDERR, "doing number $i\n");
 		
 		$articlelink = str_replace("href=\"", "", $links[$i]);
 		$articlelink = str_replace("\">", "", $articlelink);
+		
+		if ((substr($articlelink, 0, 22) !== "http://en.qstheory.cn/") && $articlelink != "") {
+			$articlelink = "http://en.qstheory.cn/".$articlelink;
+		}
 		
 		fwrite(STDERR, $articlelink.PHP_EOL.PHP_EOL);
 		
@@ -584,8 +589,8 @@ function pullFromQS() {
 		
 		preg_match('/<h1.*topBtn begin -->/s', $article, $content);
 		
-		$content = html_entity_decode($content[0]);
-		$content = htmlspecialchars_decode($content);
+		$content = html_entity_decode($content[0], ENT_QUOTES);
+		$content = htmlspecialchars_decode($content, ENT_QUOTES);
 		
 		
 		/* Gather in-article images */
@@ -613,6 +618,7 @@ function pullFromQS() {
 		$content = preg_replace('/<span style.*">/', PHP_EOL.PHP_EOL.'\begin{tiny}'.PHP_EOL, $content);
 		$content = str_replace("</span></p>", PHP_EOL.'\\end{tiny}'.PHP_EOL.PHP_EOL, $content);
 		$content = str_replace("</span>".PHP_EOL."</p>", PHP_EOL.'\\end{tiny}'.PHP_EOL.PHP_EOL, $content);
+		$content = str_replace("</span>", PHP_EOL.'\\end{tiny}'.PHP_EOL.PHP_EOL, $content);
 
 
 
@@ -660,7 +666,11 @@ function pullFromQS() {
 		
 		$body = strip_tags($body[0]);
 		
-		$newspaper = $newspaper.PHP_EOL.PHP_EOL.$title.PHP_EOL.PHP_EOL."\hfill".PHP_EOL.PHP_EOL.$body."\hfill".PHP_EOL.PHP_EOL;
+		preg_match('/.*Share - WeChat/s', $body, $trimmedbody);
+		
+		$trimmedbody = str_replace("Share - WeChat", "", $trimmedbody[0]);
+				
+		$newspaper = $newspaper.PHP_EOL.PHP_EOL.$title.PHP_EOL.PHP_EOL."\hfill".PHP_EOL.PHP_EOL.$trimmedbody."\hfill".PHP_EOL.PHP_EOL;
 		
 		$i = $i + 1;	
 	}
